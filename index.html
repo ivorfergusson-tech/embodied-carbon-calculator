@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Embodied Carbon Calculator</title>
+  <meta name="description" content="Estimate a building's embodied carbon (A1-A5) from a materials take-off, using ICE Database factors, and see how material choices like recycled vs virgin steel change the footprint." />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Embodied Carbon Calculator</h1>
+    <p class="subtitle">How much carbon a building's materials release before anyone moves in, and which choices change it.</p>
+  </header>
+
+  <main>
+    <!-- ================= Result ================= -->
+    <section class="card result-card" aria-live="polite">
+      <div class="headline">
+        <div>
+          <p class="eyebrow">Total embodied carbon (A1–A5)</p>
+          <p class="big"><span id="res-total">0.00</span> <span class="unit">tCO₂e</span></p>
+          <p class="muted" id="res-project"></p>
+        </div>
+        <div class="stage-split">
+          <div><span class="swatch s-a13"></span>A1–A3 materials <strong id="res-a13"></strong></div>
+          <div><span class="swatch s-a4"></span>A4 transport <strong id="res-a4"></strong></div>
+          <div><span class="swatch s-a5"></span>A5 construction <strong id="res-a5"></strong></div>
+        </div>
+      </div>
+      <div class="stage-bar" id="stage-bar" aria-hidden="true"></div>
+
+      <div class="compare" id="compare"></div>
+    </section>
+
+    <!-- ================= Assumptions ================= -->
+    <section class="card">
+      <h2>1. Project assumptions</h2>
+      <details class="help">
+        <summary>Why are these project-level? (click to expand)</summary>
+        <p>Transport and construction-site energy aren't really properties of a material, they depend on the job.
+        So, like the yellow input cells in the workbook, they're set once here and every row below uses them.
+        A5 is a flat % uplift because detailed site-energy data isn't normally available this early. RICS whole life
+        carbon guidance allows a default assumption when project-specific data is missing.</p>
+      </details>
+      <form id="assumptions-form" class="grid-form" onsubmit="return false">
+        <label class="wide">Project name<input type="text" id="as-name" /></label>
+        <label>Transport distance to site (km)<input type="number" id="as-distance" step="any" min="0" /></label>
+        <label>Transport factor (kgCO₂e / tonne·km)<input type="number" id="as-transport" step="any" min="0" /></label>
+        <label>A5 site allowance (% of A1–A4)<input type="number" id="as-a5" step="0.5" min="0" /></label>
+      </form>
+    </section>
+
+    <!-- ================= Materials take-off ================= -->
+    <section class="card">
+      <h2>2. Materials take-off</h2>
+      <details class="help">
+        <summary>How each row is calculated (click to expand)</summary>
+        <p><strong>Mass incl. waste</strong> = quantity × density (if taken off in m³) or quantity (if already in kg),
+        × (1 + waste allowance). Real orders always include offcuts and over-ordering, so carbon is worked out on
+        what's bought, not just what ends up in the structure.</p>
+        <p><strong>A1–A3</strong> = mass × ICE carbon factor. <strong>A4</strong> = tonnes × distance × transport factor.
+        <strong>A5</strong> = (A1–A3 + A4) × site allowance %. Change any quantity or material and the total updates live.</p>
+      </details>
+
+      <div class="table-wrap">
+        <table class="data-table takeoff-table">
+          <thead>
+            <tr>
+              <th>Element</th><th>Material</th><th class="num">Quantity</th><th>Unit</th>
+              <th class="num">Mass incl. waste (kg)</th><th class="num">A1–A3</th><th class="num">A4</th><th class="num">A5</th>
+              <th class="num">Total (kgCO₂e)</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="rows-body"></tbody>
+          <tfoot>
+            <tr class="grand-total">
+              <td colspan="5">Total (kgCO₂e)</td>
+              <td class="num" id="foot-a13"></td><td class="num" id="foot-a4"></td><td class="num" id="foot-a5"></td>
+              <td class="num" id="foot-total"></td><td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-add" class="btn-primary">Add row</button>
+        <button type="button" id="btn-sample" class="btn-secondary">Load worked example</button>
+        <button type="button" id="btn-clear" class="btn-danger">Clear all rows</button>
+      </div>
+    </section>
+
+    <!-- ================= Breakdown ================= -->
+    <section class="card">
+      <h2>3. Where the carbon comes from</h2>
+      <p class="muted small">Total embodied carbon per element (tCO₂e), largest first.</p>
+      <div id="chart" class="bars"></div>
+    </section>
+
+    <!-- ================= Factors ================= -->
+    <section class="card">
+      <h2>4. Carbon factors used</h2>
+      <details class="help">
+        <summary>Where do these numbers come from? (click to expand)</summary>
+        <p>Material factors are based on the <strong>ICE Database</strong> (Inventory of Carbon and Energy), first built at
+        the University of Bath and now maintained by Circular Ecology. It's the standard free UK reference for embodied
+        carbon. They're representative cradle-to-gate (A1–A3) figures, not product-specific EPDs. A real project would
+        use the supplier's EPD and actual delivery details.</p>
+      </details>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Material</th><th class="num">Density (kg/m³)</th><th class="num">A1–A3 factor (kgCO₂e/kg)</th><th class="num">Waste allowance</th><th>Source / notes</th></tr></thead>
+          <tbody id="factors-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= Method ================= -->
+    <section class="card">
+      <h2>5. Scope and limitations</h2>
+      <ul class="notes">
+        <li><strong>Embodied, not operational.</strong> This covers carbon from making, transporting and building, not from heating and lighting the building once it's in use.</li>
+        <li><strong>Stages A1–A5 only</strong> (BS EN 15978). It leaves out B (maintenance and replacement) and C (demolition and disposal), which a full whole-life carbon assessment would include.</li>
+        <li><strong>One transport distance and vehicle type</strong> for every material. A real project would use each supplier's actual delivery distance.</li>
+        <li><strong>Timber excludes biogenic carbon.</strong> Growing trees absorb CO₂. Some methods count that as a negative figure, but it's excluded here, so timber is if anything shown less favourably than it really is.</li>
+        <li><strong>Factors are illustrative.</strong> Check the live ICE Database (v4.1) or product EPDs before relying on any figure.</li>
+      </ul>
+    </section>
+
+    <!-- ================= Download ================= -->
+    <section class="card download">
+      <div>
+        <h2>Excel version</h2>
+        <p class="muted">The original workbook: the same calculation built from live Excel formulas (VLOOKUPs against a factors tab),
+        a material dropdown, blank template rows for a new project, a methodology tab and a summary chart.
+        Click any total to see exactly how it was worked out.</p>
+      </div>
+      <a class="btn-primary btn-link" href="downloads/Embodied-Carbon-Calculator.xlsx" download>Download the workbook (.xlsx)</a>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    Built by <a href="https://ivorfergusson-tech.github.io/">Ivor Fergusson</a> ·
+    <a href="https://github.com/ivorfergusson-tech/embodied-carbon-calculator">Source on GitHub</a>
+  </footer>
+
+  <script src="js/factors-data.js"></script>
+  <script src="js/carbon.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
